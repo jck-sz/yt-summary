@@ -1,0 +1,6 @@
+youtube-transcript-api
+pytube
+openai
+whisper  # optional, if using OpenAI's Whisper directly
+python-dotenv
+openai>=1.0.0
