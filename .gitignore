@@ -1,0 +1,61 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*.so
+
+# Environment files
+.env
+.env.*
+
+# Virtual environment
+venv/
+env/
+
+# macOS and Linux system files
+.DS_Store
+
+# Python distribution
+*.egg-info/
+dist/
+build/
+
+# Audio and transcript output
+data/audio/
+data/transcripts/
+data/summaries/
+
+# Logs
+*.log
+
+# VSCode settings
+.vscode/
+
+# ffmpeg
+ffmpeg/
+
+# Temporary files and OS trash
+*.swp
+*.tmp
+*.bak
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Python crash logs
+*.stackdump
+
+# Test outputs and coverage
+htmlcov/
+coverage.xml
+.cache/
+.tox/
+.pytest_cache/
+
+# MyPy, Pyre, Pylint
+.mypy_cache/
+.pyre/
+.pylint.d/
+
+# Editable install artifacts
+*.egg
