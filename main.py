@@ -8,6 +8,11 @@ from utils.summarizer import summarize_text
 
 load_dotenv()
 
+def guess_language_from_text(text):
+    """Basic heuristic to guess language from characters."""
+    polish_chars = set("ąćęłńóśźż")
+    return "pl" if any(c in text.lower() for c in polish_chars) else "en"
+
 def save_output(video_id, transcript, summary, base_dir="data"):
     """Save transcript and summary to disk with video ID in filename."""
     summaries_dir = os.path.join(base_dir, "summaries")
@@ -45,18 +50,20 @@ def main():
 
     if transcript_data:
         print("\n[INFO] Transcript retrieved (preview):")
-        print("\n".join(transcript_data[:10]), "...\n")  # preview first 10 lines
+        print("\n".join(transcript_data[:10]), "...\n")
         transcript_text = "\n".join(transcript_data)
+        language = guess_language_from_text(transcript_text)
     else:
         print("\n[WARN] No transcript available. Downloading audio and using Whisper...")
         audio_file = download_audio(url)
         print(f"[INFO] Audio downloaded to: {audio_file}")
-        transcript_text = transcribe_audio(audio_file)
+        transcript_text, language = transcribe_audio(audio_file)
         print("\n[INFO] Transcription complete (preview):")
         print(transcript_text[:500], "...\n")
 
+    print(f"\n[INFO] Detected language: {language.upper()}")
     print("\n--- Generating summary ---")
-    summary = summarize_text(transcript_text, style="detailed")
+    summary = summarize_text(transcript_text, language=language)
     print("\n[INFO] Summary generated:\n")
     print(summary)
 

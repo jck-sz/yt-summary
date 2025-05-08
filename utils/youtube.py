@@ -18,7 +18,7 @@ def format_timestamp(seconds):
     """Convert seconds to HH:MM:SS format."""
     return str(timedelta(seconds=int(seconds)))
 
-def get_transcript(video_id, languages=["en"]):
+def get_transcript(video_id, languages=["en", "pl"]):
     """Get transcript with timestamps."""
     try:
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)

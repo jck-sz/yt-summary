@@ -1,45 +1,59 @@
-from openai import OpenAI
 import os
+from openai import OpenAI
 
-def summarize_text(text, style="detailed", model="gpt-4"):
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def chunk_text(text, max_tokens=2000):
+    """Split text into chunks based on rough token limits (~4 chars per token)."""
+    max_chars = max_tokens * 4
+    lines = text.split("\n")
+    chunks = []
+    current_chunk = ""
+
+    for line in lines:
+        if len(current_chunk) + len(line) < max_chars:
+            current_chunk += line + "\n"
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = line + "\n"
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return chunks
+
+def summarize_text(text, language="en", model="gpt-3.5-turbo"):
     """
-    Summarize a transcript using OpenAI's GPT API.
-
-    Parameters:
-        text (str): The transcript to summarize.
-        style (str): Summary style — 'detailed', 'bullet', or 'short'.
-        model (str): OpenAI model to use.
-
-    Returns:
-        str: The summary.
+    Summarize transcript in chunks, respecting language and token limits.
     """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY not found in environment variables.")
-    
-    client = OpenAI(api_key=api_key)
 
-    if style == "bullet":
+    if language == "pl":
         prompt = (
-            "Summarize the following video transcript into clear bullet points "
-            "that capture the main ideas and topics discussed:\n\n"
+            "Stwórz szczegółowe, uporządkowane streszczenie poniższej transkrypcji w języku polskim. "
+            "Podziel streszczenie na sekcje z nagłówkami i znacznikami czasowymi w formacie [MM:SS]. "
+            "Używaj punktów i podpunktów, jeśli to możliwe.\n\n"
         )
-    elif style == "short":
-        prompt = "Summarize this video transcript in 3-4 concise sentences:\n\n"
-    else:  # detailed
+    else:
         prompt = (
-            "Create a detailed, structured summary of this video transcript, divided into logical sections "
-            "with clear headers. For each section, include an estimated timestamp based on where the topic appears. "
-            "Use format like [00:45] at the beginning of each section title.\n\n"
+            "Create a detailed, structured summary of this transcript section in English. "
+            "Divide it into logical sections with headers. Include [MM:SS] timestamps and use bullet points if helpful.\n\n"
         )
 
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant that summarizes YouTube transcripts."},
-            {"role": "user", "content": prompt + text}
-        ],
-        temperature=0.3
-    )
+    chunks = chunk_text(text)
+    all_summaries = []
 
-    return response.choices[0].message.content
+    for i, chunk in enumerate(chunks):
+        print(f"[INFO] Summarizing chunk {i+1} of {len(chunks)}...")
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a helpful assistant that summarizes transcripts."},
+                {"role": "user", "content": prompt + chunk}
+            ],
+            temperature=0.3
+        )
+        all_summaries.append(response.choices[0].message.content)
+
+    return "\n\n".join(all_summaries)
