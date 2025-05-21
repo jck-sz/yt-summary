@@ -1,73 +1,120 @@
+# utils/main.py
 import os
 import argparse
+from pathlib import Path
 from dotenv import load_dotenv
 
 from utils.youtube import extract_video_id, get_transcript, download_audio
 from utils.transcriber import transcribe_audio
-from utils.summarizer import summarize_text
+from utils.summarizer import summarize_text, generate_article
 
 load_dotenv()
 
-def guess_language_from_text(text):
-    """Basic heuristic to guess language from characters."""
-    polish_chars = set("ąćęłńóśźż")
-    return "pl" if any(c in text.lower() for c in polish_chars) else "en"
+def read_from_file(path: str) -> str | None:
+    if path.exists():
+        return path.read_text(encoding="utf-8").strip()
+    return None
 
-def save_output(video_id, transcript, summary, base_dir="data"):
-    """Save transcript and summary to disk with video ID in filename."""
-    summaries_dir = os.path.join(base_dir, "summaries")
-    transcripts_dir = os.path.join(base_dir, "transcripts")
-    os.makedirs(summaries_dir, exist_ok=True)
-    os.makedirs(transcripts_dir, exist_ok=True)
 
-    # Save full transcript
-    transcript_path = os.path.join(transcripts_dir, f"{video_id}_transcript.txt")
-    with open(transcript_path, "w", encoding="utf-8") as f:
-        f.write(transcript.strip())
-    print(f"\n[INFO] Transcript saved to: {transcript_path}")
+def save_output(video_id: str, transcript: str, summary: str, base_dir: str = "data") -> None:
+    (
+        Path(base_dir)/"transcripts"
+    ).mkdir(parents=True, exist_ok=True)
+    (
+        Path(base_dir)/"summaries"
+    ).mkdir(parents=True, exist_ok=True)
 
-    # Save summary
-    summary_path = os.path.join(summaries_dir, f"{video_id}_summary.txt")
-    with open(summary_path, "w", encoding="utf-8") as f:
-        f.write("=== SUMMARY ===\n\n")
-        f.write(summary.strip())
-    print(f"[INFO] Summary saved to: {summary_path}")
+    tpath = Path(base_dir)/"transcripts"/f"{video_id}_transcript.txt"
+    wpath = Path(base_dir)/"summaries"/f"{video_id}_summary.txt"
+    tpath.write_text(transcript, encoding="utf-8")
+    wpath.write_text(summary, encoding="utf-8")
+    print(f"[INFO] Transcript saved: {tpath}")
+    print(f"[INFO] Summary saved:    {wpath}")
 
-def main():
-    parser = argparse.ArgumentParser(description="YouTube video transcription and summarization tool.")
-    parser.add_argument("url", help="The full YouTube video URL")
+
+def save_article(video_id: str, article: str, base_dir: str = "data") -> None:
+    (
+        Path(base_dir)/"articles"
+    ).mkdir(parents=True, exist_ok=True)
+
+    apath = Path(base_dir)/"articles"/f"{video_id}_article.txt"
+    apath.write_text(article, encoding="utf-8")
+    print(f"[INFO] Article saved:    {apath}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="YouTube transcription, summarization, and article-generation CLI."
+    )
+    parser.add_argument("url", help="YouTube video URL")
+    parser.add_argument(
+        "--language",
+        choices=["en", "pl"],
+        required=True,
+        help="Language of the video",
+    )
+    parser.add_argument(
+        "--article",
+        action="store_true",
+        help="Also generate a newspaper-style article",
+    )
+    parser.add_argument(
+    "--model",
+    default="gpt-4o-mini",
+    help="Which OpenAI model to use for article generation"
+    )
     args = parser.parse_args()
 
-    url = args.url
     try:
-        video_id = extract_video_id(url)
+        vid = extract_video_id(args.url)
     except ValueError as e:
         print(f"[ERROR] Invalid URL: {e}")
         return
 
-    print("\n--- Attempting to retrieve transcript ---")
-    transcript_data = get_transcript(video_id)
+    # Prepare cache dirs
+    base = Path("data")
+    tx_dir = base/"transcripts"
+    sm_dir = base/"summaries"
+    tx_dir.mkdir(parents=True, exist_ok=True)
+    sm_dir.mkdir(parents=True, exist_ok=True)
 
-    if transcript_data:
-        print("\n[INFO] Transcript retrieved (preview):")
-        print("\n".join(transcript_data[:10]), "...\n")
-        transcript_text = "\n".join(transcript_data)
-        language = guess_language_from_text(transcript_text)
+    tfile = tx_dir/f"{vid}_transcript.txt"
+    sfile = sm_dir/f"{vid}_summary.txt"
+
+    transcript = read_from_file(tfile)
+    if transcript:
+        print(f"[INFO] Loaded transcript from cache: {tfile}")
     else:
-        print("\n[WARN] No transcript available. Downloading audio and using Whisper...")
-        audio_file = download_audio(url)
-        print(f"[INFO] Audio downloaded to: {audio_file}")
-        transcript_text, language = transcribe_audio(audio_file)
-        print("\n[INFO] Transcription complete (preview):")
-        print(transcript_text[:500], "...\n")
+        print("[INFO] Fetching transcript...")
+        data = get_transcript(vid)
+        if data:
+            transcript = "\n".join(data)
+            print("[INFO] Transcript retrieved from YouTube.")
+        else:
+            print("[WARN] No transcript; using Whisper fallback.")
+            audio = download_audio(args.url)
+            print(f"[INFO] Audio saved: {audio}")
+            transcript = transcribe_audio(audio)
 
-    print(f"\n[INFO] Detected language: {language.upper()}")
-    print("\n--- Generating summary ---")
-    summary = summarize_text(transcript_text, language=language)
-    print("\n[INFO] Summary generated:\n")
-    print(summary)
+    if not transcript:
+        print("[ERROR] Could not obtain transcript.")
+        return
 
-    save_output(video_id, transcript_text, summary)
+    summary = read_from_file(sfile)
+    if summary:
+        print(f"[INFO] Loaded summary from cache: {sfile}")
+    else:
+        print("[INFO] Generating summary...")
+        summary = summarize_text(transcript, language=args.language)
+        print("[INFO] Summary generated.")
+        save_output(vid, transcript, summary)
+
+    if args.article:
+        print("[INFO] Generating newspaper-style article...")
+        article = generate_article(transcript, language=args.language)
+        print("[INFO] Article generated.")
+        save_article(vid, article)
+
 
 if __name__ == "__main__":
     main()
