@@ -1,5 +1,5 @@
 import os
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable, CouldNotRetrieveTranscript
 from pytube import YouTube
 from datetime import timedelta
 
@@ -19,15 +19,15 @@ def format_timestamp(seconds):
     return str(timedelta(seconds=int(seconds)))
 
 def get_transcript(video_id, languages=["en", "pl"]):
-    """Get transcript with timestamps."""
+    """Try to get the transcript in preferred languages."""
     try:
         transcript = YouTubeTranscriptApi.get_transcript(video_id, languages=languages)
         return [
             f"[{format_timestamp(item['start'])}] {item['text'].strip()}"
             for item in transcript
         ]
-    except (TranscriptsDisabled, NoTranscriptFound) as e:
-        print(f"No transcript found or captions disabled: {e}")
+    except (TranscriptsDisabled, NoTranscriptFound, VideoUnavailable, CouldNotRetrieveTranscript, Exception) as e:
+        print(f"[WARN] Could not retrieve transcript: {e}")
         return None
 
 
