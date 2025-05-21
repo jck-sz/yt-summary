@@ -23,6 +23,7 @@ build/
 data/audio/
 data/transcripts/
 data/summaries/
+data/*
 
 # Logs
 *.log
